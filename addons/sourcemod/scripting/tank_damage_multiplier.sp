@@ -3,7 +3,7 @@
 
 #include <sourcemod>
 #include <sdkhooks>
-#include <sdktools>
+
 
 public Plugin myinfo = {
     name        = "TankDamageMultiplier",
@@ -17,6 +17,8 @@ public Plugin myinfo = {
 #define TEAM_SURVIVOR           2
 #define TEAM_INFECTED           3
 
+#define TANK_L4D                5
+#define TANK_L4D2               8
 
 bool g_bLateLoad = false;
 
@@ -29,8 +31,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 {
     switch (GetEngineVersion())
     {
-        case Engine_Left4Dead: g_iTankClass = 5;
-        case Engine_Left4Dead2: g_iTankClass = 8;
+        case Engine_Left4Dead: g_iTankClass = TANK_L4D;
+        case Engine_Left4Dead2: g_iTankClass = TANK_L4D2;
         default: {
             strcopy(error, err_max, "Plugin only supports Left 4 Dead & Left 4 Dead 2.");
             return APLRes_SilentFailure;
@@ -45,10 +47,11 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
     g_hTrie = CreateTrie();
-    RegServerCmd("tank_damage_multiplier_set", Command_AddTrie, "tank_damage_multiplier_set <weapon> <value>");
-    RegServerCmd("tank_damage_multiplier_remove", Command_RemoveTrie, "tank_damage_multiplier_set <weapon>");
+    RegServerCmd("tank_damage_multiplier_set", Cmd_Set, "tank_damage_multiplier_set <weapon> <value>");
+    RegServerCmd("tank_damage_multiplier_remove", Cmd_Remove, "tank_damage_multiplier_set <weapon>");
 
-    if (g_bLateLoad) {
+    if (g_bLateLoad)
+    {
         for (int iClient = 1; iClient <= MaxClients; iClient ++) {
             if (IsClientInGame(iClient)) {
                 OnClientPutInServer(iClient);
@@ -57,32 +60,36 @@ public void OnPluginStart()
     }
 }
 
-Action Command_AddTrie(int args) {
-    if (args != 2) {
+Action Cmd_Set(int iArgs)
+{
+    if (iArgs != 2)
+    {
         PrintToServer("Usage: tank_damage_multiplier_set <weapon> <value>");
         return Plugin_Handled;
     }
 
-    char key[32];
-    char value[12];
-    GetCmdArg(1, key, sizeof(key));
-    GetCmdArg(2, value, sizeof(value));
+    char szKey[32];
+    char szValue[12];
+    GetCmdArg(1, szKey, sizeof(szKey));
+    GetCmdArg(2, szValue, sizeof(szValue));
 
-    SetTrieValue(g_hTrie, key, StringToFloat(value));
+    SetTrieValue(g_hTrie, szKey, StringToFloat(szValue));
 
     return Plugin_Handled;
 }
 
-Action Command_RemoveTrie(int args) {
-    if (args != 1) {
+Action Cmd_Remove(int iArgs)
+{
+    if (iArgs != 1)
+    {
         PrintToServer("Usage: tank_damage_multiplier_remove <weapon>");
         return Plugin_Handled;
     }
 
-    char key[64];
-    GetCmdArg(1, key, sizeof(key));
+    char szKey[32];
+    GetCmdArg(1, szKey, sizeof(szKey));
 
-    RemoveFromTrie(g_hTrie, key);
+    RemoveFromTrie(g_hTrie, szKey);
 
     return Plugin_Handled;
 }
@@ -111,10 +118,10 @@ Action Hook_OnTakeDamage(int iVictim, int &iAttacker, int &iInflictor, float &fD
 
     float fMultiplier = 0.0;
 
-    char sWeaponName[64];
-    GetClientWeapon(iAttacker,sWeaponName, sizeof(sWeaponName));
+    char szWeaponName[32];
+    GetClientWeapon(iAttacker,szWeaponName, sizeof(szWeaponName));
 
-    if (!GetTrieValue(g_hTrie, sWeaponName, fMultiplier)) {
+    if (!GetTrieValue(g_hTrie, szWeaponName, fMultiplier)) {
         return Plugin_Continue;
     }
 
